@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { Supplier } from '../../suppliers/supplier';
-import { Product } from '../product';
+import { catchError, combineLatest, EMPTY, filter, map, Subject } from 'rxjs';
 
 import { ProductService } from '../product.service';
-import { EMPTY, Subject, catchError } from 'rxjs';
 
 @Component({
   selector: 'pm-product-detail',
@@ -11,12 +9,8 @@ import { EMPTY, Subject, catchError } from 'rxjs';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProductDetailComponent {
-  pageTitle = 'Product Detail';
-  private errorMessageSubject = new Subject();
+  private errorMessageSubject = new Subject<string>();
   errorMessage$ = this.errorMessageSubject.asObservable();
-
-
-  productSuppliers: Supplier[] | null = null;
 
   product$ = this.productService.selectedProduct$
     .pipe(
@@ -24,7 +18,30 @@ export class ProductDetailComponent {
         this.errorMessageSubject.next(err);
         return EMPTY;
       })
-    )
+    );
+
+  pageTitle$ = this.product$
+    .pipe(
+      map(p => p ? `Product Detail for: ${p.productName}` : null)
+    );
+
+  productSuppliers$ = this.productService.selectedProductSuppliers$
+    .pipe(
+      catchError(err => {
+        this.errorMessageSubject.next(err);
+        return EMPTY;
+      }));
+
+  vm$ = combineLatest([
+    this.product$,
+    this.productSuppliers$,
+    this.pageTitle$
+  ])
+    .pipe(
+      filter(([product]) => Boolean(product)),
+      map(([product, productSuppliers, pageTitle]) =>
+        ({ product, productSuppliers, pageTitle }))
+    );
 
   constructor(private productService: ProductService) { }
 
